@@ -35,7 +35,7 @@ def get_model(ckpt, WA=True):
         T=FLAGS.T, ch=FLAGS.ch, ch_mult=FLAGS.ch_mult, attn=FLAGS.attn,
         num_res_blocks=FLAGS.num_res_blocks, dropout=FLAGS.dropout)
     # load model and evaluate
-    ckpt = torch.load(ckpt)
+    ckpt = torch.load(ckpt, map_location='cpu')
 
     if WA:
         weights = ckpt['ema_model']
@@ -70,7 +70,7 @@ attackers: Dict[str, Type[components.DDIMAttacker]] = {
 }
 
 
-DEVICE = 'cuda'
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 @torch.no_grad()
@@ -100,7 +100,7 @@ def main(checkpoint,
                                                            shuffle=False, randaugment=False)
 
     attacker = attackers[attacker_name](
-        torch.from_numpy(np.linspace(FLAGS.beta_1, FLAGS.beta_T, FLAGS.T)).to(DEVICE), interval, attack_num, EpsGetter(model), lambda x: x * 2 - 1)
+        torch.from_numpy(np.linspace(FLAGS.beta_1, FLAGS.beta_T, FLAGS.T)).to(DEVICE), interval, attack_num, EpsGetter(model), lambda x: x * 2 - 1, lp=4)
 
     logger.info("attack start...")
     members, nonmembers = [], []
@@ -115,6 +115,10 @@ def main(checkpoint,
 
     member = members[0]
     nonmember = nonmembers[0]
+    print(members.shape, nonmembers.shape)    
+    print(member.shape, nonmember.shape)    
+    print("member sample", member)    
+    print("nonmember sample", nonmember)    
 
     auroc = [BinaryAUROC().cuda()(torch.cat([member[i] / max([member[i].max().item(), nonmember[i].max().item()]), nonmember[i] / max([member[i].max().item(), nonmember[i].max().item()])]), torch.cat([torch.zeros(member.shape[1]).long(), torch.ones(nonmember.shape[1]).long()]).cuda()).item() for i in range(member.shape[0])]
     tpr_fpr = [BinaryROC().cuda()(torch.cat([1 - nonmember[i] / max([member[i].max().item(), nonmember[i].max().item()]), 1 - member[i] / max([member[i].max().item(), nonmember[i].max().item()])]), torch.cat([torch.zeros(member.shape[1]).long(), torch.ones(nonmember.shape[1]).long()]).cuda()) for i in range(member.shape[0])]
@@ -128,4 +132,8 @@ def main(checkpoint,
 
 
 if __name__ == '__main__':
-    fire.Fire(main)
+    main(checkpoint="ckpt_cifar10.pt",
+         dataset="cifar10",
+         attacker_name="PIA",
+         attack_num=30, interval=10,
+         seed=0)

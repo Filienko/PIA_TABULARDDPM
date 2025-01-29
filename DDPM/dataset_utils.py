@@ -53,9 +53,9 @@ def load_member_data(dataset_name, batch_size=128, shuffle=False, randaugment=Fa
             transforms = torchvision.transforms.Compose([
                 torchvision.transforms.ToTensor()])
         member_set = MIACIFAR10(member_idxs, root=os.path.join(dataset_root, 'cifar10'), train=True,
-                                transform=transforms)
+                                transform=transforms, download=True)
         nonmember_set = MIACIFAR10(nonmember_idxs, root=os.path.join(dataset_root, 'cifar10'), train=True,
-                                   transform=transforms)
+                                   transform=transforms, download=True)
     elif dataset_name.upper() == 'TINY-IN':
         splits = np.load(os.path.join(member_split_root, 'TINY-IN_train_ratio0.5.npz'))
         member_idxs = splits['mia_train_idxs']
